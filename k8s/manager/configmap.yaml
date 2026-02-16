@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: picoclaw-manager-config
+  namespace: picoclaw-system
+  labels:
+    app: picoclaw-manager
+data:
+  PICOCLAW_IMAGE: "huy2408/picoclaw:latest"
+  TEMPLATE_DIR: "/templates"
+  LISTEN_ADDR: ":8080"

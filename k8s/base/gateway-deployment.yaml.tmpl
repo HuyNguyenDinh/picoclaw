@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: picoclaw-gateway
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw-gateway
+    picoclaw.io/tenant: {{ .TenantID }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: picoclaw-gateway
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: picoclaw-gateway
+        picoclaw.io/tenant: {{ .TenantID }}
+    spec:
+      serviceAccountName: picoclaw-sa
+      initContainers:
+        - name: config-init
+          image: busybox:latest
+          command: ["sh", "-c", "cp /config-readonly/config.json /config/config.json"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config-readonly
+            - name: writable-config
+              mountPath: /config
+      containers:
+        - name: picoclaw-gateway
+          image: {{ .Image }}
+          command: ["picoclaw", "gateway"]
+          resources:
+            requests:
+              cpu: {{ .GatewayCPU }}
+              memory: {{ .GatewayMemory }}
+            limits:
+              cpu: {{ .GatewayCPU }}
+              memory: {{ .GatewayMemory }}
+          volumeMounts:
+            - name: writable-config
+              mountPath: /root/.picoclaw/config.json
+              subPath: config.json
+            - name: workspace-volume
+              mountPath: /root/.picoclaw/workspace
+        - name: config-watcher
+          image: bitnami/kubectl:latest
+          command:
+            - sh
+            - -c
+            - |
+              WATCH_FILE="/config/config.json"
+              LAST_MD5=""
+              while true; do
+                sleep 5
+                if [ ! -f "$WATCH_FILE" ]; then
+                  continue
+                fi
+                CURRENT_MD5=$(md5sum "$WATCH_FILE" | awk '{print $1}')
+                if [ "$CURRENT_MD5" != "$LAST_MD5" ] && [ -n "$LAST_MD5" ]; then
+                  echo "$(date): Config changed, syncing to ConfigMap..."
+                  kubectl create configmap picoclaw-config -n {{ .Namespace }} \
+                    --from-file=config.json="$WATCH_FILE" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+                fi
+                LAST_MD5="$CURRENT_MD5"
+              done
+          volumeMounts:
+            - name: writable-config
+              mountPath: /config
+      restartPolicy: Always
+      volumes:
+        - name: config-volume
+          configMap:
+            name: picoclaw-config
+        - name: writable-config
+          emptyDir: {}
+        - name: workspace-volume
+          persistentVolumeClaim:
+            claimName: picoclaw-workspace

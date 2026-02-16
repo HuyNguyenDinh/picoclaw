@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: picoclaw-workspace
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw
+    picoclaw.io/tenant: {{ .TenantID }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .WorkspaceSize }}

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: picoclaw-manager
+    picoclaw.io/tenant: {{ .TenantID }}
+{{- range $k, $v := .Labels }}
+    {{ $k }}: {{ $v }}
+{{- end }}

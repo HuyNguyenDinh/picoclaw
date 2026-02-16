@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: picoclaw-agent
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw-agent
+    picoclaw.io/tenant: {{ .TenantID }}
+spec:
+  replicas: {{ .AgentReplicas }}
+  selector:
+    matchLabels:
+      app: picoclaw-agent
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: picoclaw-agent
+        picoclaw.io/tenant: {{ .TenantID }}
+    spec:
+      serviceAccountName: picoclaw-sa
+      initContainers:
+        - name: config-init
+          image: busybox:latest
+          command: ["sh", "-c", "cp /config-readonly/config.json /config/config.json"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config-readonly
+            - name: writable-config
+              mountPath: /config
+      containers:
+        - name: picoclaw-agent
+          image: {{ .Image }}
+          command: ["picoclaw", "agent"]
+          stdin: true
+          tty: true
+          resources:
+            requests:
+              cpu: {{ .AgentCPU }}
+              memory: {{ .AgentMemory }}
+            limits:
+              cpu: {{ .AgentCPU }}
+              memory: {{ .AgentMemory }}
+          volumeMounts:
+            - name: writable-config
+              mountPath: /root/.picoclaw/config.json
+              subPath: config.json
+            - name: workspace-volume
+              mountPath: /root/.picoclaw/workspace
+        - name: config-watcher
+          image: bitnami/kubectl:latest
+          command:
+            - sh
+            - -c
+            - |
+              LOCAL_FILE="/config/config.json"
+              LAST_MD5=""
+              while true; do
+                sleep 5
+                CM_DATA=$(kubectl get configmap picoclaw-config -n {{ .Namespace }} -o jsonpath='{.data.config\.json}' 2>/dev/null)
+                if [ -z "$CM_DATA" ]; then
+                  continue
+                fi
+                CURRENT_MD5=$(echo "$CM_DATA" | md5sum | awk '{print $1}')
+                if [ "$CURRENT_MD5" != "$LAST_MD5" ] && [ -n "$LAST_MD5" ]; then
+                  echo "$(date): ConfigMap changed, syncing to local config..."
+                  echo "$CM_DATA" > "$LOCAL_FILE"
+                fi
+                LAST_MD5="$CURRENT_MD5"
+              done
+          volumeMounts:
+            - name: writable-config
+              mountPath: /config
+      restartPolicy: Always
+      volumes:
+        - name: config-volume
+          configMap:
+            name: picoclaw-config
+        - name: writable-config
+          emptyDir: {}
+        - name: workspace-volume
+          persistentVolumeClaim:
+            claimName: picoclaw-workspace

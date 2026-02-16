@@ -1,0 +1,23 @@
+services:
+  picoclaw-agent:
+    # 1. Added image name for K8s to reference
+    image: huy2408/picoclaw
+    container_name: picoclaw-agent
+    volumes:
+      - ./config/config.json:/root/.picoclaw/config.json:ro
+      - picoclaw-workspace:/root/.picoclaw/workspace
+    entrypoint: ["picoclaw", "agent"]
+    stdin_open: true
+    tty: true
+
+  picoclaw-gateway:
+    image: huy2408/picoclaw
+    container_name: picoclaw-gateway
+    restart: unless-stopped
+    volumes:
+      - ./config/config.json:/root/.picoclaw/config.json:ro
+      - picoclaw-workspace:/root/.picoclaw/workspace
+    command: ["gateway"]
+
+volumes:
+  picoclaw-workspace:

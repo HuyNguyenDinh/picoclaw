@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: picoclaw-manager
+  namespace: picoclaw-system
+  labels:
+    app: picoclaw-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: picoclaw-manager
+  template:
+    metadata:
+      labels:
+        app: picoclaw-manager
+    spec:
+      serviceAccountName: picoclaw-manager-sa
+      containers:
+        - name: picoclaw-manager
+          image: huy2408/picoclaw-manager:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: picoclaw-manager-config
+            - secretRef:
+                name: picoclaw-manager-secret
+          volumeMounts:
+            - name: templates
+              mountPath: /templates
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: templates
+          configMap:
+            name: picoclaw-manager-templates

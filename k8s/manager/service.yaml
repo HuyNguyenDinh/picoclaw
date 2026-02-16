@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: picoclaw-manager
+  namespace: picoclaw-system
+  labels:
+    app: picoclaw-manager
+spec:
+  type: ClusterIP
+  selector:
+    app: picoclaw-manager
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http

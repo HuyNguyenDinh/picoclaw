@@ -1,0 +1,35 @@
+# ============================================================
+# Stage 1: Build the picoclaw-manager binary
+# ============================================================
+FROM golang:1.26.0-alpine AS builder
+
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source and build
+COPY . .
+RUN CGO_ENABLED=0 go build -v -o /picoclaw-manager ./cmd/picoclaw-manager
+
+# ============================================================
+# Stage 2: Minimal runtime image
+# ============================================================
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /picoclaw-manager /usr/local/bin/picoclaw-manager
+
+# Copy template files
+COPY k8s/base/ /templates/
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+
+ENTRYPOINT ["picoclaw-manager"]

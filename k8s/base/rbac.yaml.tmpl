@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: picoclaw-sa
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw
+    picoclaw.io/tenant: {{ .TenantID }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: picoclaw-configmap-writer
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw
+    picoclaw.io/tenant: {{ .TenantID }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["picoclaw-config"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: picoclaw-configmap-writer-binding
+  namespace: {{ .Namespace }}
+  labels:
+    app: picoclaw
+    picoclaw.io/tenant: {{ .TenantID }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: picoclaw-configmap-writer
+subjects:
+  - kind: ServiceAccount
+    name: picoclaw-sa
+    namespace: {{ .Namespace }}
